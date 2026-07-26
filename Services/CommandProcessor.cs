@@ -225,7 +225,6 @@ namespace Iserik.FaFOptimiser.Services
                 MaxFarms = new int[] { 0, 0, 2, 0, 0 }, // Indices 1-4
                 MaxRotations = 3,
                 TargetFertility = 140,
-                virtAnimalFeed = 0,
                 Demands = new List<CropDemand>
                 {
                     new CropDemand { Name = "Product_Corn", Target = 18 },

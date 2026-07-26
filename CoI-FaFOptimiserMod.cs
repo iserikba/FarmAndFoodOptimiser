@@ -1,4 +1,4 @@
-using Iserik.FaFOptimiser.Persistence; // Ensure this is added
+using Iserik.FaFOptimiser.Persistence;
 using Iserik.FaFOptimiser.Services;
 using Iserik.FaFOptimiser.Translations;
 using Iserik.FaFOptimiser.UI;
@@ -8,7 +8,6 @@ using Mafi.Core.Game;
 using Mafi.Core.Mods;
 using Mafi.Core.Prototypes;
 using System;
-using static Mafi.Core.Prototypes.EntityCostsTpl;
 
 namespace Iserik.FaFOptimiser
 {
@@ -24,7 +23,7 @@ namespace Iserik.FaFOptimiser
         {
             this.Manifest = manifest;
             this.JsonConfig = new ModJsonConfig(this);
-            Log.Info("FaFOptimiser: Mod successfully loaded.");
+            Log.Info("FaFOptimiser: Mod successfully instantiated.");
         }
 
         void IMod.RegisterPrototypes(ProtoRegistrator registrator) { }
@@ -38,14 +37,23 @@ namespace Iserik.FaFOptimiser
             depBuilder.RegisterDependency<FarmTelemetryService>().AsSelf();
             depBuilder.RegisterDependency<SettlementTelemetryService>().AsSelf();
             depBuilder.RegisterDependency<CommandProcessor>().AsSelf();
-            depBuilder.RegisterDependency<Iserik.FaFOptimiser.Catalog.RecipeCatalog>().AsAllInterfaces().AsSelf();
-            depBuilder.RegisterDependency<Iserik.FaFOptimiser.Services.ProductionChainService>().AsAllInterfaces().AsSelf();
+
+            // FIX: Removed .AsAllInterfaces() since these classes don't implement interfaces yet
+            depBuilder.RegisterDependency<Iserik.FaFOptimiser.Catalog.RecipeCatalog>().AsSelf();
+            depBuilder.RegisterDependency<Iserik.FaFOptimiser.Services.ProductionChainService>().AsSelf();
+
+            //depBuilder.RegisterDependency<Iserik.FaFOptimiser.Catalog.RecipeCatalog>().AsAllInterfaces().AsSelf();
+            //depBuilder.RegisterDependency<Iserik.FaFOptimiser.Services.ProductionChainService>().AsAllInterfaces().AsSelf();
 
             depBuilder.RegisterDependency<DemandStateManager>().AsSelf();
             depBuilder.RegisterDependency<GreedyByproductOptimizer>().AsSelf();
         }
 
-        void IMod.EarlyInit(DependencyResolver resolver) { }
+        void IMod.EarlyInit(DependencyResolver resolver)
+        {
+            // 1. SAFE ZONE: The engine's localization systems are fully awake here.
+            ModTranslations.Load(this.Manifest);
+        }
 
         void IMod.Initialize(DependencyResolver resolver, bool gameWasLoaded)
         {

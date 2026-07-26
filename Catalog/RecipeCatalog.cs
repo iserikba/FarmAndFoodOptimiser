@@ -75,6 +75,31 @@ namespace Iserik.FaFOptimiser.Catalog
             return false;
         }
 
+        // --- NEW: Checks if a product originates from a Chicken Farm ---
+        public bool IsChickFarmProduct(ProductProto product)
+        {
+            if (product == null) return false;
+
+            // Fast explicit ID check
+            if (product.Id == Ids.Products.Eggs || product.Id == Ids.Products.ChickenCarcass)
+            {
+                return true;
+            }
+
+            // Dynamic check against generated recipes
+            var recipes = GetRecipesProducing(product);
+            foreach (var recipe in recipes)
+            {
+                var machine = GetMachineForRecipe(recipe);
+                if (machine != null && machine.Id == Ids.Buildings.ChickenFarm)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public List<CropRecipe> GetCropRecipes()
         {
             List<CropRecipe> dynamicRecipes = new List<CropRecipe>();
@@ -330,7 +355,6 @@ namespace Iserik.FaFOptimiser.Catalog
 
         private void GenerateVirtualAnimalRecipes()
         {
-            // Fetch required products safely
             if (!this.m_protosDb.TryGetProto(IdsCore.Products.CleanWater, out ProductProto water) ||
                 !this.m_protosDb.TryGetProto(Ids.Products.AnimalFeed, out ProductProto animalFeed) ||
                 !this.m_protosDb.TryGetProto(Ids.Products.Eggs, out ProductProto egg) ||
@@ -340,8 +364,7 @@ namespace Iserik.FaFOptimiser.Catalog
                 return;
             }
 
-            // Standard Baseline Ratios for a Chicken Farm block (per 60 seconds)
-            // Adjust these Quantity numbers to match the exact mathematical ratio you want the BOM engine to use!
+            // Standard Baseline Ratios for exactly 1 Chicken Farm (500 Chickens / 1 Month)
             var inputs = new Lyst<RecipeInput>
             {
                 new RecipeInput(animalFeed, new Quantity(15)),
@@ -351,34 +374,23 @@ namespace Iserik.FaFOptimiser.Catalog
             var outputs = new Lyst<RecipeOutput>
             {
                 new RecipeOutput(egg, new Quantity(7)),
-                new RecipeOutput(chickenCarcass, new Quantity(10)),
+                new RecipeOutput(chickenCarcass, new Quantity(10))
             };
 
-
-            // 1. Define the ID once so we can use it for both the Recipe and the Strings
-            RecipeProto.ID recipeId = new RecipeProto.ID("VirtualRecipe_ChickenFarm");
+            RecipeProto.ID recipeId = new RecipeProto.ID("VirtualRecipe_FeedChickens");
 
             var virtualChickenRecipe = new RecipeProto(
                 id: recipeId,
-                strings: Proto.CreateStr(recipeId, "Chicken Farm Production", "Virtual representation for BOM Explosion"),
+                strings: Proto.CreateStr(recipeId, "Chicken Flock Feeding", "Consumes Feed & Water for 500 Chickens (1 Farm)"),
                 allInputs: inputs.ToImmutableArray(),
                 allOutputs: outputs.ToImmutableArray()
             );
 
-            // ==========================================
-            // THE FIX: Fetch as Proto, save as IProtoWithIcon
-            // ==========================================
             if (this.m_protosDb.TryGetProto(Ids.Buildings.ChickenFarm, out Proto rawProto) && rawProto is IProtoWithIcon chickenFarmIcon)
             {
-                // This will now succeed because we aren't forcing an AnimalFarm into a MachineProto box!
                 this.m_machineByRecipe[virtualChickenRecipe] = chickenFarmIcon;
             }
-            else
-            {
-                Log.Warning("[FaFOptimiser] FAILED to map ChickenFarm icon!");
-            }
 
-            // 2. Add to your master list
             this.m_virtualRecipes.Add(virtualChickenRecipe);
         }
 

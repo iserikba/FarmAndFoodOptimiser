@@ -1,6 +1,7 @@
 ﻿using Iserik.FaFOptimiser.Services;
 using Iserik.FaFOptimiser.Translations;
 using Mafi;
+using Mafi.Base;
 using Mafi.Core.Products;
 using Mafi.Localization;
 using Mafi.Unity.Ui.Library;
@@ -50,8 +51,17 @@ namespace Iserik.FaFOptimiser.UI
             // 3. Build each chain using the native ButtonRow
             foreach (var chain in this.m_chains)
             {
-                bool isActiveChain = this.m_demandManager.SelectedChains.TryGetValue(this.m_targetProduct, out var activeChain)
-                                     && chain.IsEquivalentTo(activeChain);
+                // Look in SelectedChains first; fallback to SelectedFlockChain if checking Animal Feed
+                ResolvedChain activeChain = null;
+                if (!this.m_demandManager.SelectedChains.TryGetValue(this.m_targetProduct, out activeChain))
+                {
+                    if (this.m_targetProduct.Id == Ids.Products.AnimalFeed)
+                    {
+                        activeChain = this.m_demandManager.SelectedFlockChain;
+                    }
+                }
+
+                bool isActiveChain = (activeChain != null && chain.IsEquivalentTo(activeChain));
 
                 // Button.Area provides the dark background, hover glow, and selected green border
                 ButtonRow chainLine = new ButtonRow(Button.Area, null)

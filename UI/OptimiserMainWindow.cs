@@ -24,7 +24,7 @@ namespace Iserik.FaFOptimiser.UI
                     : base(Strings.WindowTitle, false)
         {
 #if PUBLIC_BUILD
-            base.WindowSize(850.px(), 750.px());
+            base.WindowSize(950.px(), 750.px());
 #else
             base.WindowSize(1250.px(), 750.px());
 #endif

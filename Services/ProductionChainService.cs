@@ -23,35 +23,32 @@ namespace Iserik.FaFOptimiser.Services
         {
             List<ResolvedChain> alternatives = new List<ResolvedChain>();
 
-            // ==========================================
-            // CYCLE DETECTION (Infinite Loop Prevention)
-            // ==========================================
             if (visited == null) visited = new HashSet<ProductProto>();
-
-            if (visited.Contains(targetProduct))
-            {
-                return alternatives;
-            }
+            if (visited.Contains(targetProduct)) return alternatives;
 
             HashSet<ProductProto> currentPathVisited = new HashSet<ProductProto>(visited);
             currentPathVisited.Add(targetProduct);
 
-            // ==========================================
-            // 1. Fetch all recipes that make this product
-            // ==========================================
             var producingRecipes = this.m_catalog.GetRecipesProducing(targetProduct);
+            bool isCrop = this.m_catalog.IsCrop(targetProduct);
+            bool isLivestock = this.m_catalog.IsChickFarmProduct(targetProduct);
 
-            // BASE CASE: Raw crops / Uncraftable base materials
-            if (producingRecipes.IsEmpty)
+            // Treat Crops and Livestock Products (Eggs/CC) strictly as terminal leaf nodes!
+            // Their feeding requirements are now handled centrally by the Unified Flock Model.
+            if (producingRecipes.IsEmpty || isLivestock)
             {
                 var baseChain = new ResolvedChain { TargetProduct = targetProduct, TargetAmount = targetAmount };
-                baseChain.RawCropDemands[targetProduct] = targetAmount;
+                if (isCrop)
+                {
+                    baseChain.RawCropDemands[targetProduct] = targetAmount;
+                }
 
                 baseChain.RootNode = new ChainNode
                 {
-                    IsBaseResource = true,
-                    IsFarm = false,
-                    MachineName = "Raw Resource",
+                    IsBaseResource = !isCrop && !isLivestock,
+                    IsFarm = isCrop,
+                    IsChickFarm = isLivestock,
+                    MachineName = isCrop ? "Farm" : (isLivestock ? "Chicken Farm Output" : "Raw Resource"),
                     MachineCount = 0,
                     OutputProduct = targetProduct,
                     OutputAmount = targetAmount
@@ -61,18 +58,9 @@ namespace Iserik.FaFOptimiser.Services
                 return alternatives;
             }
 
-            // ==========================================
-            // RECURSIVE CASE: Iterate through possible recipes
-            // ==========================================
             foreach (RecipeProto recipe in producingRecipes)
             {
                 bool isVirtualRecipe = recipe.Id.Value.StartsWith("VirtualRecipe_");
-
-                //if (isVirtualRecipe && !recipe.Id.Value.Contains("ChickenFarm"))
-                //{
-                //    if (!recipe.Id.Value.Contains("FarmT2")) continue;
-                //}
-
                 if (!isVirtualRecipe && !recipe.IsUnlockedAndAvailable) continue;
 
                 Fix32 outputQty = Fix32.One;
@@ -86,36 +74,27 @@ namespace Iserik.FaFOptimiser.Services
                 }
                 Fix32 recipeRuns = targetAmount / outputQty;
 
-                // Get the machine or farm proto
-                // Get the machine or farm proto
                 IProtoWithIcon actualMachineProto = this.m_catalog.GetFarmForRecipe(recipe) ?? (IProtoWithIcon)this.m_catalog.GetMachineForRecipe(recipe);
                 string machineName = actualMachineProto?.Strings.Name.TranslatedString ?? "Unknown Factory";
+
                 bool isFarm = this.m_catalog.GetFarmForRecipe(recipe) != null;
                 if (isFarm) machineName = "Farm";
 
-                // --- THE FIX: Universal Time Math ---
-                float recipeDurationMonths = 1f; // Default for Virtual Farm Recipes (already normalized to 1 month)
+                bool isChickFarmRecipe = recipe.Id.Value.Contains("FeedChickens");
+                if (isChickFarmRecipe) machineName = "Chicken Farm Flock";
 
-                // If this is a real machine, extract the duration from its specific recipe binding
+                float recipeDurationMonths = 1f;
                 if (!isFarm && actualMachineProto is MachineProto machineProto)
                 {
                     var binding = machineProto.GetRecipeBindingFor(recipe);
-
-                    // Calculate how much of a 60-second month this specific recipe takes to run once
                     recipeDurationMonths = (float)binding.Duration.Ticks / (float)60.Seconds().Ticks;
                 }
 
-                // Multiply the total required runs by the time it takes to do one run
                 double machineCount = recipeRuns.ToFloat() * recipeDurationMonths;
-                // ------------------------------------
-
 
                 List<ResolvedChain> currentRecipePermutations = new List<ResolvedChain> { new ResolvedChain() };
                 bool isDeadPath = false;
 
-                // ==========================================
-                // THE FIX: ACCUMULATE INPUTS WITHOUT NESTING
-                // ==========================================
                 foreach (var input in recipe.AllUserVisibleInputs)
                 {
                     Fix32 inputAmountNeeded = input.Quantity.Value.ToFix32() * recipeRuns;
@@ -151,13 +130,11 @@ namespace Iserik.FaFOptimiser.Services
 
                             combined.FarmsNeeded = existingPerm.FarmsNeeded + inputAlternative.FarmsNeeded;
 
-                            // Safely copy over the pending inputs we gathered from previous ingredients
                             foreach (var pending in existingPerm.PendingInputs)
                             {
                                 combined.PendingInputs.Add(pending.Clone());
                             }
 
-                            // Add the new branch for this ingredient
                             if (inputAlternative.RootNode != null)
                             {
                                 combined.PendingInputs.Add(inputAlternative.RootNode.Clone());
@@ -171,19 +148,16 @@ namespace Iserik.FaFOptimiser.Services
 
                 if (isDeadPath) continue;
 
-                // ==========================================
-                // THE FIX: BUILD THE SINGLE PARENT NODE HERE
-                // ==========================================
                 foreach (var perm in currentRecipePermutations)
                 {
                     perm.TargetProduct = targetProduct;
                     perm.TargetAmount = targetAmount;
-                    if (isFarm) perm.FarmsNeeded += machineCount;
+                    if (isFarm || isChickFarmRecipe) perm.FarmsNeeded += machineCount;
 
-                    // Create ONE node for the machine
                     perm.RootNode = new ChainNode
                     {
                         IsFarm = isFarm,
+                        IsChickFarm = isChickFarmRecipe,
                         IsBaseResource = false,
                         MachineName = machineName,
                         MachineCount = machineCount,
@@ -192,14 +166,12 @@ namespace Iserik.FaFOptimiser.Services
                         OutputAmount = targetAmount
                     };
 
-                    // Attach all the accumulated branches directly to this machine!
                     foreach (var pendingInput in perm.PendingInputs)
                     {
                         perm.RootNode.Inputs.Add(pendingInput);
                     }
-                    perm.PendingInputs.Clear(); // Cleanup the temporary list
+                    perm.PendingInputs.Clear();
 
-                    // Add byproducts
                     foreach (var output in recipe.AllUserVisibleOutputs)
                     {
                         if (output.Product != targetProduct)
@@ -214,31 +186,21 @@ namespace Iserik.FaFOptimiser.Services
                 }
             }
 
-            // --- FINALIZE, DEDUPLICATE, AND SORT CHAINS ---
-
-            // 1. Calculate scores for everything first
             foreach (var chain in alternatives)
             {
                 CalculateScore(chain);
             }
 
-            // 2. Sort them so the most efficient chains (lowest score) are processed first
             alternatives = alternatives.OrderBy(c => c.ResourceScore).ToList();
-
             List<ResolvedChain> uniqueAlternatives = new List<ResolvedChain>();
 
-            // 3. Deduplicate
             foreach (var chain in alternatives)
             {
-                if (chain.FarmsNeeded <= 0)
-                {
-                    continue;
-                }
+                if (chain.RootNode == null) continue;
 
                 bool isDuplicate = false;
                 foreach (var uniqueChain in uniqueAlternatives)
                 {
-                    // Because the list is sorted, the first one saved is guaranteed to be the most efficient!
                     if (chain.IsEquivalentTo(uniqueChain))
                     {
                         isDuplicate = true;

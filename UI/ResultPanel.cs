@@ -78,10 +78,11 @@ namespace Iserik.FaFOptimiser.UI
                 {
                     float target = (float)cropSummary.Target;
                     float deficit = (float)cropSummary.Deficit;
+                    if (System.Math.Abs(deficit) < 0.05) deficit = 0;
                     row.Add(renderProductTile(productProto, target - deficit, -deficit));
                 }
             }
-            this.m_cropsBody.Add(row);
+            this.m_cropsBody.Add(row); 
 
             // 2. RENDER FARMS BLUEPRINT
             for (int tier = 1; tier < 5; tier++)
