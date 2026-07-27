@@ -1,5 +1,5 @@
 Advanced Farm & Food Optimiser Mod for Captain of Industry
-This tools helps you to explore sustainable pathways for food, land use, and crop balance in your Captain of Industry game
+Calculate exact crop, farm, and livestock needs for food and industry while optimising crop rotations and production chains without manual maths.
 
 How to install this mod
 =======================

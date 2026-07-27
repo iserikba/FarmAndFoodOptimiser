@@ -6,6 +6,8 @@
 **Status:** Released (v0.1.0 Release Candidate / v0.0.5 Beta)
 **Core Technologies:** C#, Mixed-Integer Linear Programming (MILP), Unity UI, Asynchronous Task Management, Dependency Injection
 
+Calculate exact crop, farm, and livestock needs for food and industry while optimising crop rotations and production chains without manual maths.
+
 ## 📌 Project Overview
 
 The vanilla agricultural system in *Captain of Industry* presents a complex, multi-variable optimization problem. Dynamic population demands, food variety edicts, and the interconnected "butterfly effect" of soil fertility make balancing crop yields manually nearly impossible.

@@ -6,7 +6,7 @@
 	"min_game_version": "0.8.4",
 	"max_verified_game_version": "0.8.6a",
 	"display_name": "Advanced Farm & Food Optimiser",
-	"description_short": "Take the guesswork out of farming, livestock, and food production by optimising land use, rotations, and production chains.",
+	"description_short": "Calculate exact crop, farm, and livestock needs for food and industry while optimising crop rotations and production chains without manual maths.",
 	"authors": [ "Iserik" ],
 	"can_add_to_saved_game": true,
 	"can_remove_from_saved_game": true
